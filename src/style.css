@@ -74,29 +74,12 @@ h1 em { color: #e87b6d; }
 .turn-status { margin-bottom: 3px; color: #b7b4ab; display: flex; align-items: center; gap: 7px; font-size: 8px; }
 .status-pip { width: 6px; height: 6px; border-radius: 50%; background: var(--red); box-shadow: 0 0 8px #e65d5080; }
 .status-pip.rival-pip { background: var(--gold); box-shadow: 0 0 8px #d7b57480; }
-.board-frame { position: relative; width: 100%; padding: 13px; background: #1b1c20; border: 1px solid #393a3e; box-shadow: 0 20px 55px #0006, inset 0 0 0 4px #ffffff04; }
-.board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); overflow: hidden; border: 1px solid #111; }
-.square { min-width: 0; aspect-ratio: 1; position: relative; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer; }
-.square.light { background: #d4cbb6; }
-.square.dark { background: #687b7b; }
-.square.last-move.light { background: #d5bd85; }
-.square.last-move.dark { background: #a78d55; }
-.square.selected { background: #d8a54e; }
-.square.in-check { background: #bb5751; box-shadow: inset 0 0 0 4px #f28a64; }
-.piece { z-index: 1; line-height: 1; display: block; transform: translateY(-2%); user-select: none; transition: transform .14s, filter .14s; font-family: 'DejaVu Sans', 'Segoe UI Symbol', serif; font-size: clamp(25px, 5.2vw, 59px); }
-.square:hover .piece { transform: translateY(-8%); filter: brightness(1.1); }
-.white-piece { color: #f5f0e2; -webkit-text-stroke: 1px #675f53; text-shadow: 0 3px 1px #332f2c, 0 5px 5px #23201db0; }
-.black-piece { color: #292e30; -webkit-text-stroke: .5px #101314; text-shadow: 0 2px 1px #a4a99e7a, 0 5px 4px #1a1d1e8c; }
-.king-piece { filter: drop-shadow(0 0 4px #e2bc7470); }
-.move-dot { width: 23%; aspect-ratio: 1; border-radius: 50%; background: #25282a65; }
-.capture-target::after { content: ''; position: absolute; inset: 3px; border: 4px solid #962f2a99; border-radius: 50%; }
-.coordinate-files { position: absolute; left: 13px; right: 13px; height: 12px; display: grid; grid-template-columns: repeat(8, 1fr); text-align: center; color: #87847d; font: 8px var(--mono); }
-.coordinate-files span { align-self: center; }
-.coordinate-files:not(.files-bottom) { top: 0; transform: translateY(1px); }
-.files-bottom { bottom: 0; transform: translateY(-1px); }
-.coordinate-ranks { position: absolute; top: 13px; bottom: 13px; left: 0; width: 12px; display: grid; grid-template-rows: repeat(8, 1fr); align-items: center; justify-items: center; color: #87847d; font: 8px var(--mono); }
-.coordinate-ranks span { line-height: 1; }
-.ranks-right { left: auto; right: 0; }
+.board-stage { position: relative; isolation: isolate; width: 100%; }
+.board-scene { width: 100%; aspect-ratio: 1; overflow: hidden; background: radial-gradient(ellipse at 50% 42%, #25282b, #111316 72%); touch-action: none; }
+.board-scene canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+.view-reset { position: absolute; top: 12px; right: 12px; z-index: 2; width: 34px; height: 34px; display: grid; place-items: center; color: #c4b998; background: #191b1dd9; border: 1px solid #77705d80; cursor: pointer; transition: color .2s, border-color .2s; }
+.view-reset:hover { color: #f2dfad; border-color: var(--gold); }
+.view-reset svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .board-footer { display: flex; gap: 17px; align-items: center; padding-top: 13px; color: #88878a; font-size: 8px; }
 .board-footer > span { display: flex; align-items: center; gap: 6px; }
 .legend-dot { display: inline-block; width: 7px; height: 7px; background: #a78d55; }
@@ -158,6 +141,16 @@ h1 em { color: #e87b6d; }
 .dismiss-toast { color: #a5a1a0; background: transparent; font-size: 18px; }
 .modal-backdrop { position: fixed; z-index: 8; inset: 0; display: grid; place-items: center; padding: 20px; background: #090a0bd9; backdrop-filter: blur(7px); }
 .modal-backdrop[hidden] { display: none; }
+.promotion-backdrop { position: fixed; z-index: 7; inset: 0; display: grid; place-items: center; padding: 20px; background: #090a0bd9; backdrop-filter: blur(7px); }
+.promotion-backdrop[hidden] { display: none; }
+.promotion-modal { width: min(440px, 100%); padding: 30px; text-align: center; background: #1c1d21; border: 1px solid #474148; box-shadow: 0 24px 90px #0009; animation: appear .24s ease-out; }
+.promotion-modal h2 { margin: 12px 0 22px; color: var(--paper); font: 500 25px var(--serif); }
+.promotion-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.promotion-option { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 13px 5px 11px; color: #bcb8ae; background: #25272c; border: 1px solid #3c3e43; cursor: pointer; font: 8px var(--mono); transition: .18s; }
+.promotion-option:hover, .promotion-option:focus-visible { color: #f3e5c4; background: #332b22; border-color: var(--gold); }
+.promotion-glyph { color: #ece5d6; font: 34px/1 'DejaVu Sans', 'Segoe UI Symbol', serif; text-shadow: 0 2px 5px #000b; }
+.promotion-cancel { margin-top: 19px; padding: 8px 13px; color: #89878c; background: transparent; border: 0; border-bottom: 1px solid #44434a; cursor: pointer; font: 8px var(--mono); }
+.promotion-cancel:hover { color: var(--paper); }
 .result-modal { width: min(420px, 100%); padding: 38px; text-align: center; background: #1c1d21; border: 1px solid #474148; box-shadow: 0 24px 90px #0009; animation: appear .35s ease-out; }
 .modal-kicker { color: var(--gold); }
 .result-modal h2 { margin: 16px 0 10px; color: var(--paper); font: 500 31px var(--serif); }
@@ -187,10 +180,7 @@ h1 em { color: #e87b6d; }
   .board-column { width: 100%; order: 0; }
   .board-heading { margin-bottom: 15px; }
   h1 { font-size: 27px; }
-  .board-frame { padding: 11px; }
-  .coordinate-files { left: 11px; right: 11px; }
-  .coordinate-ranks { top: 11px; bottom: 11px; }
-  .piece { font-size: clamp(28px, 9.2vw, 48px); }
+  .board-scene { width: 100%; }
   .board-footer { gap: 10px; font-size: 7px; }
   .command-column { width: 100%; order: 1; display: grid; grid-template-columns: 1fr; }
   .command-panel { padding: 15px; }
@@ -211,8 +201,5 @@ h1 em { color: #e87b6d; }
   .match-label { font-size: 7px; }
   .wordmark { font-size: 11px; gap: 8px; }
   .arena { width: calc(100% - 20px); }
-  .board-frame { padding: 9px; }
-  .coordinate-files { left: 9px; right: 9px; }
-  .coordinate-ranks { top: 9px; bottom: 9px; }
   .board-footer { gap: 7px; font-size: 6px; }
 }

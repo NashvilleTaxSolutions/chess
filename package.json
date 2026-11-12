@@ -8,7 +8,8 @@
     "build": "vite build"
   },
   "dependencies": {
-    "chess.js": "^1.4.0"
+    "chess.js": "^1.4.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "vite": "^6.3.5"
