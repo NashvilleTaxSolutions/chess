@@ -10,6 +10,20 @@ const glyphs = {
 const labels = { k: 'King', q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight', p: 'Pawn' };
 const values = { k: 0, q: 9, r: 5, b: 3.2, n: 3, p: 1 };
 const files = 'abcdefgh';
+const bots = [
+  { id: 'wanderer', name: 'The Wanderer', title: 'EASY', rating: 'I', depth: 0, icon: '♟', skill: 'Wild opening', description: 'Unpredictable choices and the occasional surprise.', unlock: 'surge' },
+  { id: 'duelist', name: 'The Duelist', title: 'MEDIUM', rating: 'II', depth: 1, icon: '⚔', skill: 'Counterpunch', description: 'Looks for checks and captures, but can miss a deeper plan.', unlock: 'insight' },
+  { id: 'architect', name: 'The Architect', title: 'HARD', rating: 'III', depth: 2, icon: '♜', skill: 'Deep calculation', description: 'Searches ahead to build positional pressure.', unlock: 'resolve' },
+  { id: 'oracle', name: 'The Oracle', title: 'HARDEST', rating: 'IV', depth: 3, icon: '♛', skill: 'Long-range foresight', description: 'Calculates several moves ahead and punishes mistakes.', unlock: 'second-wind' },
+];
+const skills = [
+  { id: 'rally', name: 'Rally', detail: 'Restore 12 conviction to every living piece.', icon: '✳' },
+  { id: 'surge', name: 'Authority surge', detail: 'Gain 2 authority, up to the 4-point limit.', icon: '✦' },
+  { id: 'insight', name: 'Read the board', detail: 'Reveal a strong move for your current turn.', icon: '⌕' },
+  { id: 'resolve', name: 'Resolve', detail: 'Restore 20 conviction to your living pieces.', icon: '◈' },
+  { id: 'second-wind', name: 'Second wind', detail: 'Bring pieces below 45 conviction up to 45.', icon: '↟' },
+];
+const storedSkills = JSON.parse(localStorage.getItem('crown-zero-skills') || '[]');
 
 let game = new Chess();
 let selected = null;
@@ -20,7 +34,12 @@ let lastMove = null;
 let thinking = false;
 let gameOver = false;
 let pendingOrder = null;
+let playerColor = 'w';
+let selectedBot = bots[0];
+let usedSkills = new Set();
+let unlockedSkills = new Set(['rally', ...(Array.isArray(storedSkills) ? storedSkills : [])]);
 let noticeTimer;
+let botTimer;
 let renderer;
 let scene;
 let camera;
@@ -44,21 +63,21 @@ function renderShell() {
       <div class="match-label"><span class="live-dot"></span> THE IMPERIAL TABLE <span class="match-id">MATCH 07</span></div>
       <button class="icon-button" id="new-game" aria-label="Start a new match" title="Start a new match"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4"/></svg></button>
     </header>
-    <main class="arena">
+    <main class="arena" hidden>
       <section class="match-column" aria-label="Match status">
         <div class="section-kicker">CURRENT MATCH <span>01 — 01</span></div>
         <div class="player-card player-you">
-          <div class="player-top"><div class="avatar avatar-you">Y</div><div><div class="player-name">THE USURPER</div><div class="player-sub">PLAYER · WHITE</div></div><span class="turn-marker" id="you-turn">YOUR TURN</span></div>
+          <div class="player-top"><div class="avatar avatar-you">Y</div><div><div class="player-name">THE USURPER</div><div class="player-sub" id="you-side">PLAYER · WHITE</div></div><span class="turn-marker" id="you-turn">YOUR TURN</span></div>
           <div class="player-rank"><span>TACTICAL RATING</span><strong>1,420</strong></div>
           <div class="rating-line"><span></span></div>
         </div>
         <div class="versus"><span></span> VS <span></span></div>
         <div class="player-card player-rival">
-          <div class="player-top"><div class="avatar avatar-rival">♜</div><div><div class="player-name">THE REGENT</div><div class="player-sub">OPPONENT · BLACK</div></div><span class="thinking-label" id="rival-turn">AWAITING</span></div>
-          <div class="player-rank"><span>THREAT LEVEL</span><strong>III</strong></div>
+          <div class="player-top"><div class="avatar avatar-rival" id="rival-avatar">♜</div><div><div class="player-name" id="rival-name">THE WANDERER</div><div class="player-sub" id="rival-side">OPPONENT · BLACK</div><div class="player-sub" id="rival-skill">SKILL · WILD OPENING</div></div><span class="thinking-label" id="rival-turn">AWAITING</span></div>
+          <div class="player-rank"><span>THREAT LEVEL</span><strong id="rival-rating">I</strong></div>
           <div class="rating-line rival-rating"><span></span></div>
         </div>
-        <div class="match-note"><span class="note-icon">✳</span><p>“A crown is not inherited. It is taken from the board.”</p><span class="note-credit">— THE REGENT</span></div>
+        <div class="match-note"><span class="note-icon">✳</span><p>“A crown is not inherited. It is taken from the board.”</p><span class="note-credit" id="bot-credit">— THE WANDERER</span></div>
       </section>
 
       <section class="board-column" aria-label="Chess board">
@@ -75,6 +94,8 @@ function renderShell() {
           <p class="authority-copy">Earn authority with decisive play. Spend it to force a disloyal piece to obey.</p>
           <div class="faith-title"><span>UNIT CONVICTION</span><span id="faith-overview">16 UNITS</span></div>
           <div class="faith-roster" id="faith-roster"></div>
+          <div class="skill-title"><span>YOUR SKILLS</span><span>WIN TO UNLOCK</span></div>
+          <div class="skill-roster" id="skill-roster"></div>
           <div class="command-hint"><span>!</span><p>A unit below <b>25%</b> may refuse a move that throws it into danger.</p></div>
         </section>
         <section class="history-panel">
@@ -84,13 +105,32 @@ function renderShell() {
         </section>
       </aside>
     </main>
+    <section class="setup-screen" id="setup-screen" aria-labelledby="setup-title">
+      <div class="setup-panel">
+        <div class="setup-kicker">THE IMPERIAL TABLE · MATCH SETUP</div>
+        <h1 id="setup-title">Choose your <em>opponent.</em></h1>
+        <p class="setup-intro">Every rival has a different way of thinking. Pick your challenge, then choose your side.</p>
+        <div class="setup-label"><span>01</span> SELECT A RIVAL</div>
+        <div class="bot-grid" id="bot-grid"></div>
+        <div class="setup-bottom">
+          <fieldset class="side-picker">
+            <legend><span>02</span> CHOOSE YOUR SIDE</legend>
+            <button type="button" class="side-option is-selected" data-color="w" aria-pressed="true"><span>♔</span> WHITE</button>
+            <button type="button" class="side-option" data-color="b" aria-pressed="false"><span>♚</span> BLACK</button>
+          </fieldset>
+          <button class="begin-button" id="begin-match" type="button">BEGIN MATCH <span>↗</span></button>
+        </div>
+        <p class="unlock-note" id="unlock-note"></p>
+      </div>
+    </section>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="promotion-backdrop" id="promotion-backdrop" hidden><section class="promotion-modal" role="dialog" aria-modal="true" aria-labelledby="promotion-title"><div class="modal-kicker">A PAWN REACHES THE THRONE</div><h2 id="promotion-title">Choose its new form.</h2><div class="promotion-options" id="promotion-options"></div><button class="promotion-cancel" id="promotion-cancel" type="button">CANCEL</button></section></div>
     <div class="modal-backdrop" id="modal-backdrop" hidden><div class="result-modal"><div class="modal-kicker">THE IMPERIAL TABLE</div><h2 id="result-title">Checkmate.</h2><p id="result-copy"></p><button id="rematch-button">PLAY AGAIN <span>↗</span></button></div></div>
   `;
 
-  document.querySelector('#new-game').addEventListener('click', startNewGame);
-  document.querySelector('#rematch-button').addEventListener('click', startNewGame);
+  document.querySelector('#new-game').addEventListener('click', showSetup);
+  document.querySelector('#rematch-button').addEventListener('click', showSetup);
+  document.querySelector('#begin-match').addEventListener('click', startNewGame);
   document.querySelector('#resign-button').addEventListener('click', resign);
   document.querySelector('#reset-view').addEventListener('click', () => controls?.reset());
   document.querySelector('#promotion-cancel').addEventListener('click', hidePromotionChooser);
@@ -100,6 +140,41 @@ function renderShell() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && promotionMoves) hidePromotionChooser();
   });
+  renderSetup();
+}
+
+function renderSetup() {
+  const grid = document.querySelector('#bot-grid');
+  grid.innerHTML = bots.map((bot) => `
+    <button class="bot-card ${bot.id === selectedBot.id ? 'is-selected' : ''}" type="button" data-bot="${bot.id}" aria-pressed="${bot.id === selectedBot.id}">
+      <span class="bot-card-top"><span class="bot-icon">${bot.icon}</span><span class="bot-level">${bot.title}</span></span>
+      <strong>${bot.name}</strong>
+      <span class="bot-description">${bot.description}</span>
+      <span class="bot-skill"><b>SKILL</b> ${bot.skill}</span>
+    </button>`).join('');
+  grid.querySelectorAll('[data-bot]').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectedBot = bots.find((bot) => bot.id === button.dataset.bot);
+      renderSetup();
+    });
+  });
+  document.querySelectorAll('.side-option').forEach((button) => {
+    button.classList.toggle('is-selected', button.dataset.color === playerColor);
+    button.setAttribute('aria-pressed', String(button.dataset.color === playerColor));
+    button.onclick = () => {
+      playerColor = button.dataset.color;
+      renderSetup();
+    };
+  });
+  document.querySelector('#unlock-note').textContent = `Win against ${selectedBot.name} to unlock ${skills.find((skill) => skill.id === selectedBot.unlock).name}.`;
+}
+
+function showSetup() {
+  window.clearTimeout(botTimer);
+  document.querySelector('#modal-backdrop').hidden = true;
+  document.querySelector('.arena').hidden = true;
+  document.querySelector('#setup-screen').hidden = false;
+  renderSetup();
 }
 
 function pieceId(square, piece) {
@@ -395,15 +470,64 @@ function renderFaith() {
   const roster = document.querySelector('#faith-roster');
   const entries = [];
   game.board().forEach((rank, row) => rank.forEach((piece, col) => {
-    if (piece?.color === 'w') {
+    if (piece?.color === playerColor) {
       const square = `${files[col]}${8 - row}`;
       entries.push({ piece, square, value: getFaith(square, piece) });
     }
   }));
-  roster.innerHTML = entries.map(({ piece, square, value }) => `<div class="faith-unit" title="${labels[piece.type]} at ${square}: ${value}% conviction"><span class="faith-glyph">${glyphs.w[piece.type]}</span><span class="faith-meter"><i class="${value < 35 ? 'low-faith' : ''}" style="width:${value}%"></i></span></div>`).join('');
+  roster.innerHTML = entries.map(({ piece, square, value }) => `<div class="faith-unit" title="${labels[piece.type]} at ${square}: ${value}% conviction"><span class="faith-glyph">${glyphs[playerColor][piece.type]}</span><span class="faith-meter"><i class="${value < 35 ? 'low-faith' : ''}" style="width:${value}%"></i></span></div>`).join('');
   document.querySelector('#faith-overview').textContent = `${entries.length.toString().padStart(2, '0')} UNITS`;
   document.querySelector('#authority-count').textContent = authority.toString().padStart(2, '0');
   document.querySelector('#authority-track').innerHTML = Array.from({ length: 4 }, (_, i) => `<i class="${i < authority ? 'filled' : ''}"></i>`).join('');
+  renderSkills();
+}
+
+function renderSkills() {
+  const roster = document.querySelector('#skill-roster');
+  roster.innerHTML = skills.filter((skill) => unlockedSkills.has(skill.id)).map((skill) => `
+    <button class="skill-button" type="button" data-skill="${skill.id}" title="${skill.detail}" ${usedSkills.has(skill.id) || gameOver ? 'disabled' : ''}>
+      <span>${skill.icon}</span><b>${skill.name}</b>${usedSkills.has(skill.id) ? '<small>USED</small>' : ''}
+    </button>`).join('');
+  roster.querySelectorAll('[data-skill]').forEach((button) => {
+    button.addEventListener('click', () => activateSkill(button.dataset.skill));
+  });
+}
+
+function activateSkill(id) {
+  if (!unlockedSkills.has(id) || usedSkills.has(id) || gameOver || thinking || game.turn() !== playerColor || pendingOrder) return;
+  const skill = skills.find((item) => item.id === id);
+  if (id === 'rally' || id === 'resolve') {
+    const boost = id === 'rally' ? 12 : 20;
+    game.board().forEach((rank, row) => rank.forEach((piece, col) => {
+      if (piece?.color !== playerColor) return;
+      const square = `${files[col]}${8 - row}`;
+      const key = pieceId(square, piece);
+      faith.set(key, Math.min(100, getFaith(square, piece) + boost));
+    }));
+    showToast(`${skill.name.toUpperCase()} ACTIVATED`, skill.detail, false);
+  } else if (id === 'surge') {
+    authority = Math.min(4, authority + 2);
+    showToast(`${skill.name.toUpperCase()} ACTIVATED`, skill.detail, false);
+  } else if (id === 'second-wind') {
+    game.board().forEach((rank, row) => rank.forEach((piece, col) => {
+      if (piece?.color !== playerColor) return;
+      const square = `${files[col]}${8 - row}`;
+      const key = pieceId(square, piece);
+      const value = getFaith(square, piece);
+      if (value < 45) faith.set(key, 45);
+    }));
+    showToast(`${skill.name.toUpperCase()} ACTIVATED`, skill.detail, false);
+  } else if (id === 'insight') {
+    const moves = game.moves({ verbose: true });
+    const best = moves.map((move) => ({ move, score: scoreMove(move, playerColor) })).sort((a, b) => b.score - a.score)[0]?.move;
+    if (!best) return;
+    selected = best.from;
+    legalMoves = [best];
+    showToast('THE BOARD REVEALS A PATH', `${labels[game.get(best.from).type]} ${best.from} to ${best.to} is a strong candidate.`, false);
+  }
+  usedSkills.add(id);
+  renderBoard();
+  renderFaith();
 }
 
 function renderHistory() {
@@ -418,17 +542,27 @@ function renderHistory() {
 }
 
 function updateStatus() {
-  const whiteTurn = game.turn() === 'w' && !thinking && !gameOver;
-  document.querySelector('#you-turn').textContent = whiteTurn ? 'YOUR TURN' : gameOver ? 'MATCH ENDED' : 'STANDING BY';
-  document.querySelector('#you-turn').classList.toggle('is-waiting', !whiteTurn);
+  const playerTurn = game.turn() === playerColor && !thinking && !gameOver;
+  const playerSide = playerColor === 'w' ? 'WHITE' : 'BLACK';
+  const rivalSide = playerColor === 'w' ? 'BLACK' : 'WHITE';
+  document.querySelector('#you-side').textContent = `PLAYER · ${playerSide}`;
+  document.querySelector('#rival-side').textContent = `OPPONENT · ${rivalSide}`;
+  document.querySelector('#rival-name').textContent = selectedBot.name.toUpperCase();
+  document.querySelector('#rival-avatar').textContent = selectedBot.icon;
+  document.querySelector('#rival-skill').textContent = `SKILL · ${selectedBot.skill.toUpperCase()}`;
+  document.querySelector('#bot-credit').textContent = `— ${selectedBot.name.toUpperCase()}`;
+  document.querySelector('#rival-rating').textContent = selectedBot.rating;
+  document.querySelector('#you-turn').textContent = playerTurn ? 'YOUR TURN' : gameOver ? 'MATCH ENDED' : 'STANDING BY';
+  document.querySelector('#you-turn').classList.toggle('is-waiting', !playerTurn);
   document.querySelector('#rival-turn').textContent = thinking ? 'THINKING' : gameOver ? 'MATCH ENDED' : 'AWAITING';
   document.querySelector('#rival-turn').classList.toggle('is-thinking', thinking);
-  document.querySelector('#turn-status').innerHTML = `<span class="status-pip ${thinking ? 'rival-pip' : ''}"></span> ${thinking ? 'REGENT THINKS' : gameOver ? 'MATCH COMPLETE' : 'YOUR MOVE'}`;
+  document.querySelector('#turn-status').innerHTML = `<span class="status-pip ${thinking ? 'rival-pip' : ''}"></span> ${thinking ? 'RIVAL THINKS' : gameOver ? 'MATCH COMPLETE' : 'YOUR MOVE'}`;
   document.querySelector('#resign-button').disabled = gameOver;
+  renderSkills();
 }
 
 function onSquareClick(square) {
-  if (game.turn() !== 'w' || thinking || gameOver || pendingOrder || promotionMoves) return;
+  if (game.turn() !== playerColor || thinking || gameOver || pendingOrder || promotionMoves) return;
   const piece = game.get(square);
   if (selected && legalMoves.some((move) => move.to === square)) {
     const movesToSquare = legalMoves.filter((candidate) => candidate.to === square);
@@ -436,7 +570,7 @@ function onSquareClick(square) {
     else attemptMove(movesToSquare[0]);
     return;
   }
-  if (piece?.color === 'w') {
+  if (piece?.color === playerColor) {
     selected = square;
     legalMoves = game.moves({ square, verbose: true });
   } else {
@@ -473,14 +607,42 @@ function scoreMove(move, side) {
   return score;
 }
 
+function searchMove(chess, move, depth, perspective) {
+  chess.move({ from: move.from, to: move.to, promotion: move.promotion || 'q' });
+  const score = searchPosition(chess, depth - 1, perspective, -Infinity, Infinity);
+  chess.undo();
+  return score;
+}
+
+function searchPosition(chess, depth, perspective, alpha, beta) {
+  if (chess.isCheckmate()) return chess.turn() === perspective ? -10000 - depth : 10000 + depth;
+  if (chess.isDraw()) return 0;
+  if (depth === 0) return positionScore(chess, perspective);
+
+  const maximizing = chess.turn() === perspective;
+  const moves = chess.moves({ verbose: true }).sort((a, b) => Number(Boolean(b.captured)) - Number(Boolean(a.captured)));
+  let best = maximizing ? -Infinity : Infinity;
+  for (const move of moves) {
+    chess.move({ from: move.from, to: move.to, promotion: move.promotion || 'q' });
+    const score = searchPosition(chess, depth - 1, perspective, alpha, beta);
+    chess.undo();
+    best = maximizing ? Math.max(best, score) : Math.min(best, score);
+    if (maximizing) alpha = Math.max(alpha, best);
+    else beta = Math.min(beta, best);
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
 function attemptMove(move, force = false) {
-  const candidates = game.moves({ verbose: true }).map((candidate) => ({ move: candidate, score: scoreMove(candidate, 'w') }));
+  const botColor = playerColor === 'w' ? 'b' : 'w';
+  const candidates = game.moves({ verbose: true }).map((candidate) => ({ move: candidate, score: scoreMove(candidate, playerColor) }));
   const best = Math.max(...candidates.map((candidate) => candidate.score));
   const chosen = candidates.find(({ move: candidate }) => candidate.from === move.from && candidate.to === move.to && candidate.promotion === move.promotion);
   const gap = best - chosen.score;
   const movedPiece = game.get(move.from);
   const pieceFaith = getFaith(move.from, movedPiece);
-  const appearsDangerous = isSquareAttackedAfter(move, move.to, 'b');
+  const appearsDangerous = isSquareAttackedAfter(move, move.to, botColor);
   const orderIsRisky = gap > 1.45 && appearsDangerous;
 
   if (orderIsRisky && pieceFaith < 25 && !force) {
@@ -516,7 +678,7 @@ function attemptMove(move, force = false) {
   }
 
   const moveTurn = Math.floor(moveNumber / 2);
-  if (moveNumber % 2 === 0) history.push({ white: result.san, black: '', quality: quality.text, qualityClass: quality.className });
+  if (result.color === 'w') history.push({ white: result.san, black: '', quality: quality.text, qualityClass: quality.className });
   else history[moveTurn].black = result.san;
   moveNumber += 1;
   renderBoard();
@@ -525,7 +687,7 @@ function attemptMove(move, force = false) {
   if (checkGameOver()) return;
   thinking = true;
   updateStatus();
-  window.setTimeout(makeRivalMove, 480);
+  botTimer = window.setTimeout(makeRivalMove, 480);
 }
 
 function isSquareAttackedAfter(move, target, byColor) {
@@ -551,15 +713,30 @@ function qualityLabel(gap) {
 }
 
 function makeRivalMove() {
+  botTimer = null;
   if (gameOver) return;
   const moves = game.moves({ verbose: true });
-  const scored = moves.map((move) => ({ move, score: scoreMove(move, 'b') }));
+  const botColor = playerColor === 'w' ? 'b' : 'w';
+  const scored = moves.map((move) => {
+    let score = selectedBot.depth > 1
+      ? searchMove(game, move, selectedBot.depth, botColor)
+      : scoreMove(move, botColor);
+    if (selectedBot.id === 'duelist' && (move.captured || move.san.includes('+'))) score += 0.45;
+    return { move, score };
+  });
   scored.sort((a, b) => b.score - a.score);
-  const shortlist = scored.slice(0, Math.min(4, scored.length));
-  const chosen = shortlist[Math.floor(Math.random() * Math.min(shortlist.length, 2))].move;
+  let chosen;
+  if (selectedBot.depth === 0) {
+    chosen = moves[Math.floor(Math.random() * moves.length)];
+  } else {
+    const shortlist = scored.slice(0, selectedBot.depth === 1 ? 3 : selectedBot.depth === 2 ? 2 : 1);
+    chosen = shortlist[Math.floor(Math.random() * shortlist.length)].move;
+  }
+  if (moves.length === 0) return checkGameOver();
   const result = game.move({ from: chosen.from, to: chosen.to, promotion: chosen.promotion || 'q' });
-  const turn = history.at(-1);
-  if (turn) turn.black = result.san;
+  const turnIndex = Math.floor((game.history().length - 1) / 2);
+  if (result.color === 'w') history.push({ white: result.san, black: '' });
+  else if (history[turnIndex]) history[turnIndex].black = result.san;
   moveNumber += 1;
   thinking = false;
   renderBoard();
@@ -622,8 +799,18 @@ function checkGameOver() {
   if (!game.isGameOver()) return false;
   gameOver = true;
   updateStatus();
-  const title = game.isCheckmate() ? (game.turn() === 'w' ? 'The crown is lost.' : 'The crown is yours.') : 'A draw at the table.';
-  const copy = game.isCheckmate() ? (game.turn() === 'w' ? 'The Regent outplayed you. Rebuild your command and challenge the table again.' : 'Your strategy held. Every piece followed you to the final move.') : 'Neither side could claim the throne. The match is recorded as a draw.';
+  const botColor = playerColor === 'w' ? 'b' : 'w';
+  const playerWon = game.isCheckmate() && game.turn() === botColor;
+  let copy = game.isCheckmate() ? (playerWon ? 'Every piece followed you to the final move.' : `${selectedBot.name} outplayed you. Rebuild your command and challenge the table again.`) : 'Neither side could claim the throne. The match is recorded as a draw.';
+  if (playerWon) {
+    const newSkill = selectedBot.unlock;
+    if (!unlockedSkills.has(newSkill)) {
+      unlockedSkills.add(newSkill);
+      localStorage.setItem('crown-zero-skills', JSON.stringify([...unlockedSkills].filter((id) => id !== 'rally')));
+      copy += ` ${skills.find((skill) => skill.id === newSkill).name} unlocked.`;
+    }
+  }
+  const title = game.isCheckmate() ? (playerWon ? 'The crown is yours.' : 'The crown is lost.') : 'A draw at the table.';
   showResult(title, copy);
   return true;
 }
@@ -638,10 +825,12 @@ function resign() {
   if (gameOver) return;
   gameOver = true;
   updateStatus();
-  showResult('The crown is surrendered.', 'The Regent accepts your concession. A new match is waiting at the table.');
+  showResult('The crown is surrendered.', `${selectedBot.name} accepts your concession. Choose a new rival for your next match.`);
 }
 
 function startNewGame() {
+  window.clearTimeout(botTimer);
+  botTimer = null;
   game = new Chess();
   selected = null;
   legalMoves = [];
@@ -650,14 +839,28 @@ function startNewGame() {
   thinking = false;
   gameOver = false;
   pendingOrder = null;
+  usedSkills = new Set();
   hidePromotionChooser();
   faith.clear();
   history.length = 0;
   document.querySelector('#modal-backdrop').hidden = true;
   document.querySelector('#toast').classList.remove('visible');
+  document.querySelector('#setup-screen').hidden = true;
+  document.querySelector('.arena').hidden = false;
+  resizeBoard();
+  if (playerColor === 'b') camera.position.set(-9, 10.5, -12);
+  else camera.position.set(9, 10.5, 12);
+  controls.target.set(0, 0.2, 0);
+  controls.update();
+  controls.saveState();
   renderBoard();
   renderHistory();
   updateStatus();
+  if (playerColor === 'b') {
+    thinking = true;
+    updateStatus();
+    botTimer = window.setTimeout(makeRivalMove, 480);
+  }
 }
 
 renderShell();
