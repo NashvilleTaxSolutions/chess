@@ -11,17 +11,17 @@ const labels = { k: 'King', q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight', p: 
 const values = { k: 0, q: 9, r: 5, b: 3.2, n: 3, p: 1 };
 const files = 'abcdefgh';
 const bots = [
-  { id: 'wanderer', name: 'The Wanderer', title: 'EASY', rating: 'I', depth: 0, icon: '♟', skill: 'Wild opening', description: 'Unpredictable choices and the occasional surprise.', unlock: 'surge' },
-  { id: 'duelist', name: 'The Duelist', title: 'MEDIUM', rating: 'II', depth: 1, icon: '⚔', skill: 'Counterpunch', description: 'Looks for checks and captures, but can miss a deeper plan.', unlock: 'insight' },
-  { id: 'architect', name: 'The Architect', title: 'HARD', rating: 'III', depth: 2, icon: '♜', skill: 'Deep calculation', description: 'Searches ahead to build positional pressure.', unlock: 'resolve' },
-  { id: 'oracle', name: 'The Oracle', title: 'HARDEST', rating: 'IV', depth: 3, icon: '♛', skill: 'Long-range foresight', description: 'Calculates several moves ahead and punishes mistakes.', unlock: 'second-wind' },
+  { id: 'wanderer', name: 'The Wanderer', title: 'EASY', rating: 'I', depth: 0, icon: '♟', skill: 'Wild opening', description: 'A beginner-level rival with little long-term planning.', skillDetail: 'Chooses a random legal move each turn.', unlock: 'surge' },
+  { id: 'duelist', name: 'The Duelist', title: 'MEDIUM', rating: 'II', depth: 1, icon: '⚔', skill: 'Counterpunch', description: 'Scores moves one turn ahead, with some unpredictability.', skillDetail: 'Slightly favors checks and captures, then picks among its three top moves.', unlock: 'insight' },
+  { id: 'architect', name: 'The Architect', title: 'HARD', rating: 'III', depth: 2, icon: '♜', skill: 'Deep calculation', description: 'Plans three plies ahead using minimax search.', skillDetail: 'Uses alpha-beta pruning and randomly picks from its two best moves.', unlock: 'resolve' },
+  { id: 'oracle', name: 'The Oracle', title: 'HARDEST', rating: 'IV', depth: 3, icon: '♛', skill: 'Long-range foresight', description: 'Plans four plies ahead using minimax search.', skillDetail: 'Uses alpha-beta pruning and selects its top-scoring move.', unlock: 'second-wind' },
 ];
 const skills = [
-  { id: 'rally', name: 'Rally', detail: 'Restore 12 conviction to every living piece.', icon: '✳' },
-  { id: 'surge', name: 'Authority surge', detail: 'Gain 2 authority, up to the 4-point limit.', icon: '✦' },
-  { id: 'insight', name: 'Read the board', detail: 'Reveal a strong move for your current turn.', icon: '⌕' },
-  { id: 'resolve', name: 'Resolve', detail: 'Restore 20 conviction to your living pieces.', icon: '◈' },
-  { id: 'second-wind', name: 'Second wind', detail: 'Bring pieces below 45 conviction up to 45.', icon: '↟' },
+  { id: 'rally', name: 'Rally', detail: 'Restore 12 conviction to each living piece on your side.', icon: '✳' },
+  { id: 'surge', name: 'Authority surge', detail: 'Gain up to 2 authority, capped at 4.', icon: '✦' },
+  { id: 'insight', name: 'Read the board', detail: 'Highlight one strong legal move, including its piece and destination.', icon: '⌕' },
+  { id: 'resolve', name: 'Resolve', detail: 'Restore 20 conviction to each living piece on your side.', icon: '◈' },
+  { id: 'second-wind', name: 'Second wind', detail: 'Raise each of your pieces below 45 conviction to 45.', icon: '↟' },
 ];
 const storedSkills = JSON.parse(localStorage.getItem('crown-zero-skills') || '[]');
 
@@ -74,6 +74,7 @@ function renderShell() {
         <div class="versus"><span></span> VS <span></span></div>
         <div class="player-card player-rival">
           <div class="player-top"><div class="avatar avatar-rival" id="rival-avatar">♜</div><div><div class="player-name" id="rival-name">THE WANDERER</div><div class="player-sub" id="rival-side">OPPONENT · BLACK</div><div class="player-sub" id="rival-skill">SKILL · WILD OPENING</div></div><span class="thinking-label" id="rival-turn">AWAITING</span></div>
+          <div class="rival-skill-detail" id="rival-skill-detail">Chooses a random legal move each turn.</div>
           <div class="player-rank"><span>THREAT LEVEL</span><strong id="rival-rating">I</strong></div>
           <div class="rating-line rival-rating"><span></span></div>
         </div>
@@ -150,7 +151,7 @@ function renderSetup() {
       <span class="bot-card-top"><span class="bot-icon">${bot.icon}</span><span class="bot-level">${bot.title}</span></span>
       <strong>${bot.name}</strong>
       <span class="bot-description">${bot.description}</span>
-      <span class="bot-skill"><b>SKILL</b> ${bot.skill}</span>
+      <span class="bot-skill"><b>SKILL · ${bot.skill}</b><span>${bot.skillDetail}</span></span>
     </button>`).join('');
   grid.querySelectorAll('[data-bot]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -166,7 +167,8 @@ function renderSetup() {
       renderSetup();
     };
   });
-  document.querySelector('#unlock-note').textContent = `Win against ${selectedBot.name} to unlock ${skills.find((skill) => skill.id === selectedBot.unlock).name}.`;
+  const unlock = skills.find((skill) => skill.id === selectedBot.unlock);
+  document.querySelector('#unlock-note').textContent = `Defeat ${selectedBot.name} to unlock ${unlock.name}: ${unlock.detail} Each player skill can be used once per match.`;
 }
 
 function showSetup() {
@@ -485,8 +487,8 @@ function renderFaith() {
 function renderSkills() {
   const roster = document.querySelector('#skill-roster');
   roster.innerHTML = skills.filter((skill) => unlockedSkills.has(skill.id)).map((skill) => `
-    <button class="skill-button" type="button" data-skill="${skill.id}" title="${skill.detail}" ${usedSkills.has(skill.id) || gameOver ? 'disabled' : ''}>
-      <span>${skill.icon}</span><b>${skill.name}</b>${usedSkills.has(skill.id) ? '<small>USED</small>' : ''}
+    <button class="skill-button" type="button" data-skill="${skill.id}" ${usedSkills.has(skill.id) || gameOver ? 'disabled' : ''}>
+      <span class="skill-icon">${skill.icon}</span><span class="skill-copy"><b>${skill.name}</b><small class="skill-description">${skill.detail} Once per match.</small></span>${usedSkills.has(skill.id) ? '<small class="skill-usage">USED</small>' : ''}
     </button>`).join('');
   roster.querySelectorAll('[data-skill]').forEach((button) => {
     button.addEventListener('click', () => activateSkill(button.dataset.skill));
@@ -550,6 +552,7 @@ function updateStatus() {
   document.querySelector('#rival-name').textContent = selectedBot.name.toUpperCase();
   document.querySelector('#rival-avatar').textContent = selectedBot.icon;
   document.querySelector('#rival-skill').textContent = `SKILL · ${selectedBot.skill.toUpperCase()}`;
+  document.querySelector('#rival-skill-detail').textContent = selectedBot.skillDetail;
   document.querySelector('#bot-credit').textContent = `— ${selectedBot.name.toUpperCase()}`;
   document.querySelector('#rival-rating').textContent = selectedBot.rating;
   document.querySelector('#you-turn').textContent = playerTurn ? 'YOUR TURN' : gameOver ? 'MATCH ENDED' : 'STANDING BY';
@@ -807,7 +810,8 @@ function checkGameOver() {
     if (!unlockedSkills.has(newSkill)) {
       unlockedSkills.add(newSkill);
       localStorage.setItem('crown-zero-skills', JSON.stringify([...unlockedSkills].filter((id) => id !== 'rally')));
-      copy += ` ${skills.find((skill) => skill.id === newSkill).name} unlocked.`;
+      const unlockedSkill = skills.find((skill) => skill.id === newSkill);
+      copy += ` ${unlockedSkill.name} unlocked: ${unlockedSkill.detail}`;
     }
   }
   const title = game.isCheckmate() ? (playerWon ? 'The crown is yours.' : 'The crown is lost.') : 'A draw at the table.';

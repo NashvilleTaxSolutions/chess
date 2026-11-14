@@ -168,16 +168,16 @@ h1 em { color: #e87b6d; }
 .setup-label { margin-bottom: 12px; color: #bcb8ae; }
 .setup-label span, .side-picker legend span { margin-right: 8px; color: var(--gold); }
 .bot-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.bot-card { min-width: 0; min-height: 190px; padding: 15px 13px 12px; display: flex; flex-direction: column; align-items: flex-start; text-align: left; color: #e9e7e1; background: #222429; border: 1px solid #3a3b40; cursor: pointer; transition: .18s; }
+.bot-card { min-width: 0; min-height: 220px; padding: 15px 13px 12px; display: flex; flex-direction: column; align-items: flex-start; text-align: left; color: #e9e7e1; background: #222429; border: 1px solid #3a3b40; cursor: pointer; transition: .18s; }
 .bot-card:hover, .bot-card.is-selected { background: #292621; border-color: var(--gold); box-shadow: inset 0 0 0 1px #d7b57440; }
 .bot-card-top { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .bot-icon { color: #cbb57d; font: 24px var(--serif); }
 .bot-level { padding: 5px 6px; color: #a7a4a0; border: 1px solid #414147; font-size: 7px; }
 .bot-card.is-selected .bot-level { color: var(--gold); border-color: #8e754a; }
 .bot-card strong { font: 500 15px var(--serif); }
-.bot-description { min-height: 48px; margin-top: 7px; color: #a4a1a0; font-size: 10px; line-height: 1.5; }
-.bot-skill { margin-top: auto; padding-top: 11px; color: #c8c0b0; font-size: 9px; }
-.bot-skill b { margin-right: 4px; color: #88858a; font-size: 7px; }
+.bot-description { min-height: 42px; margin-top: 7px; color: #a4a1a0; font-size: 10px; line-height: 1.5; }
+.bot-skill { margin-top: auto; padding-top: 11px; color: #c8c0b0; font-size: 9px; line-height: 1.45; }
+.bot-skill b { display: block; margin: 0 0 4px; color: #cbb57d; font-size: 7px; }
 .setup-bottom { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-top: 27px; padding-top: 20px; border-top: 1px solid #34353a; }
 .side-picker { min-width: 0; display: flex; gap: 8px; margin: 0; padding: 0; border: 0; }
 .side-picker legend { margin-bottom: 10px; padding: 0; color: #bcb8ae; }
@@ -191,12 +191,15 @@ h1 em { color: #e87b6d; }
 .skill-title { padding-top: 15px; display: flex; justify-content: space-between; border-top: 1px solid #303137; color: #85848a; font-size: 8px; }
 .skill-title span + span { color: #66666d; font-size: 7px; }
 .skill-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px 0 14px; }
-.skill-button { min-width: 0; padding: 8px 7px; display: flex; align-items: center; gap: 6px; color: #c9c4b8; background: #25272c; border: 1px solid #3a3b40; text-align: left; cursor: pointer; font-size: 9px; }
-.skill-button > span { color: var(--gold); font-size: 12px; }
-.skill-button b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.skill-button small { margin-left: auto; color: #77777c; font-size: 6px; }
+.skill-button { min-width: 0; padding: 8px 7px; display: flex; align-items: flex-start; gap: 6px; color: #c9c4b8; background: #25272c; border: 1px solid #3a3b40; text-align: left; cursor: pointer; font-size: 9px; }
+.skill-button > .skill-icon { flex: 0 0 auto; color: var(--gold); font-size: 12px; }
+.skill-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.skill-button b { font-weight: 500; }
+.skill-button .skill-description { color: #99979b; font: 8px/1.45 'DM Sans', sans-serif; letter-spacing: 0; }
+.skill-button .skill-usage { margin-left: auto; color: #77777c; font-size: 6px; }
 .skill-button:hover:not(:disabled) { border-color: var(--gold); color: #f1e4c8; }
 .skill-button:disabled { opacity: .48; cursor: default; }
+.rival-skill-detail { margin: 8px 0 0 45px; color: #96949a; font-size: 8px; line-height: 1.45; }
 
 @keyframes blink { 50% { opacity: .45; } }
 @keyframes appear { from { opacity: 0; transform: translateY(9px) scale(.98); } to { opacity: 1; transform: none; } }
@@ -239,7 +242,7 @@ h1 em { color: #e87b6d; }
   .setup-panel { padding: 23px 17px; }
   .setup-intro { margin-bottom: 22px; }
   .bot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bot-card { min-height: 175px; padding: 12px 10px; }
+  .bot-card { min-height: 210px; padding: 12px 10px; }
   .setup-bottom { align-items: stretch; flex-direction: column; gap: 18px; }
   .side-picker { flex-wrap: wrap; }
   .side-picker legend { width: 100%; }
